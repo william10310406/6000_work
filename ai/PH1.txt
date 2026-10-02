@@ -1,0 +1,736 @@
+def cmdPH1_SAVEB():
+    pass
+    import tkinter
+    if not 'PH1LB02' in globals():
+       pass
+    else:
+       ss=PH1LB02.get(0.0,tkinter.END)
+       dirname=os.path.join(physicsHOMEDIR,'physicsSpace')
+       filenameTXT=os.path.join(dirname,'PH1.txt')
+       ssOLD=open(filenameTXT,'r',encoding='utf-8').read()
+
+       ssSplitL=ssOLD.split("###CONTBEGIN")
+       sContent=ssSplitL[0]
+       for ii in range(1,4):
+           sContent=sContent+'###CONTBEGIN'+ssSplitL[ii]
+       sContent=sContent+'''
+    ###CONTBEGIN
+'''
+
+       sContent=sContent+'''
+    ss="""'''+ss+'''"""'''
+
+       ssSplitR=ssOLD.split("###CONTEND")
+       sContent=sContent+'''
+    ###CONTEND
+'''+ssSplitR[-1]
+       print(sContent)
+
+       fid=open(filenameTXT,'w',encoding='utf-8')
+       fid.write(sContent)
+       fid.close()
+   
+       for w in LF.winfo_children():
+           if isinstance(w,tkinter.Button):
+              if w.cget('text')=='PH1':
+                 w.invoke()
+                 PH1_NoteB.invoke()
+
+def cmdPH1_SpaceB():
+       import os
+       import platform
+       pass 
+       import tkinter
+       meDIR=os.path.join(os.path.join(physicsHOMEDIR,'physicsSpace'),'PH1Space')
+       DIRC=meDIR
+       pdflist=[x for x in os.listdir(DIRC) if not os.path.isdir(os.path.join(DIRC,x)) ]
+       NN=len(pdflist)
+       NC=3
+       NR=NN//NC+int(NN%3>0)
+       DX=1./NC
+       DY=1./NR
+       iii=-1
+       if len(pdflist)>0:
+          if 'physicsPH1ListSpaceWIN' in globals():
+              del physicsListSpaceWIN
+          physicsPH1ListSpaceWIN=tkinter.Toplevel()
+          physicsPH1ListSpaceWIN.geometry('600x400+80+80')
+          if 'BBB' in globals():
+              del BBB
+          BBB=[]
+          for x in pdflist:
+              B=tkinter.Button(physicsPH1ListSpaceWIN)
+              BBB.append(B)
+              BBB[-1].configure(text=x)
+              filePDF=os.path.join(DIRC,x)
+              if platform.system() in ['Darwin','Linux']:
+                 BBB[-1].configure(command=lambda bb=filePDF:os.system('open "'+bb+'"'))
+              else:
+                 BBB[-1].configure(command=lambda bb=filePDF:os.system('start "'+bb+'"'))
+              iii+=1
+              BBB[-1].place(relx=(iii%NC)*DX,rely=(iii//NC)*DY,relwidth=DX,relheight=DY)
+
+import tkinter as tk
+import numpy as np
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+
+
+#######################
+#######################
+#######################
+# iris: dataset
+# 1. Class 0: setosa
+# 2.       1: vericolor
+# 3.       2: virginica
+#######################
+def MethodRF(LF_subWIN):
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    from sklearn.datasets import load_iris
+    from sklearn.ensemble import RandomForestClassifier
+    from sklearn.model_selection import train_test_split
+    import matplotlib.font_manager as fm
+    
+    plt.rcParams['font.sans-serif']=['Arial Unicode Ms']
+    
+    # 1. 載入資料（僅取前兩個特徵以利二維視覺化）
+    iris = load_iris()
+    X = iris.data[:, :2]  # 只取 sepal length 和 sepal width
+    y = iris.target
+    
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+    
+    # 2. 訓練隨機森林模型
+    clf = RandomForestClassifier(n_estimators=100, max_depth=5, random_state=42)
+    clf.fit(X_train, y_train)
+
+    ich=1
+
+    if ich==0:
+       # 3. 開始畫圖
+       fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+       # --- 圖一：決策邊界分布圖 ---
+       ax1 = axes[0]
+       # 建立網格以繪製邊界
+       x_min, x_max = X[:, 0].min() - 0.5, X[:, 0].max() + 0.5
+       y_min, y_max = X[:, 1].min() - 0.5, X[:, 1].max() + 0.5
+       xx, yy = np.meshgrid(np.arange(x_min, x_max, 0.02),np.arange(y_min, y_max, 0.02))
+       # 預測網格上每個點的類別
+       Z = clf.predict(np.c_[xx.ravel(), yy.ravel()])
+       Z = Z.reshape(xx.shape)
+       # 繪製填色等高線圖（決策區域）
+       ax1.contourf(xx, yy, Z, alpha=0.3, cmap=plt.cm.coolwarm)
+       # 繪製測試集的實際樣本點
+       scatter = ax1.scatter(X_test[:, 0], X_test[:, 1], c=y_test, edgecolor='k', cmap=plt.cm.coolwarm, s=60, label=y_test)
+       ax1.set_title("隨機森林決策邊界與測試集分布", fontsize=14, pad=15)
+       ax1.set_xlabel(iris.feature_names[0], fontsize=12)
+       ax1.set_ylabel(iris.feature_names[1], fontsize=12)
+       # 建立圖例
+       handles, _ = scatter.legend_elements()
+       ax1.legend(handles, iris.target_names, loc="lower right", title="實際類別")
+       # --- 圖二：預測機率信賴度分布圖 ---
+       ax2 = axes[1]
+       # 取得模型對測試集預測各類別的機率
+       y_proba = clf.predict_proba(X_test)
+       # 取得模型最終預測的最大機率值（代表對該預測的信心度）
+       max_proba = np.max(y_proba, axis=1)
+       # 繪製預測信賴度的密度分布 (KDE)
+       sns.histplot(max_proba, kde=True, ax=ax2, color="skyblue", bins=10, edgecolor="white")
+       ax2.set_title("模型預測信賴度（最大機率）分布圖", fontsize=14, pad=15)
+       ax2.set_xlabel("預測機率 (Confidence)", fontsize=12)
+       ax2.set_ylabel("樣本數量 / 密度", fontsize=12)
+       ax2.axvline(x=0.5, color='red', linestyle='--', label='隨機猜測門檻 (0.5)')
+       ax2.legend()
+       plt.tight_layout()
+       plt.show()
+    
+    
+    if ich==1:
+       import numpy as np
+       from io import BytesIO
+       import matplotlib.pyplot as plt
+       from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
+       # 【關鍵】指定 Mac 內建支援中文的字型，避免 Mac 上出現方塊亂碼
+       plt.rcParams['font.sans-serif'] = ['Arial Unicode MS', 'PingFang TC']
+       plt.rcParams['axes.unicode_minus'] = False  # 正確顯示負號
+
+       Canvas=tkinter.Canvas(LF_subWIN)
+       Canvas.place(relx=0.1,rely=0.15,relwidth=0.8,relheight=0.8)
+       CanvasFig=plt.Figure()
+       Canvas2=FigureCanvasTkAgg(CanvasFig,Canvas)
+       Canvas2.get_tk_widget().place(relx=0,rely=0,relwidth=1,relheight=1)
+       CanvasFig.clear()
+
+       axes=[[] for ii in range(1*2)]
+
+       # 3. 開始畫圖
+       axes[0] =CanvasFig.add_subplot(1,2,1)
+       axes[1] =CanvasFig.add_subplot(1,2,2)
+
+       # --- 圖一：決策邊界分布圖 ---
+       # 建立網格以繪製邊界
+       x_min, x_max = X[:, 0].min() - 0.5, X[:, 0].max() + 0.5
+       y_min, y_max = X[:, 1].min() - 0.5, X[:, 1].max() + 0.5
+       xx, yy = np.meshgrid(np.arange(x_min, x_max, 0.02),np.arange(y_min, y_max, 0.02))
+       # 預測網格上每個點的類別
+       Z = clf.predict(np.c_[xx.ravel(), yy.ravel()])
+       Z = Z.reshape(xx.shape)
+       # 繪製填色等高線圖（決策區域）
+       axes[0].contourf(xx, yy, Z, alpha=0.3, cmap=plt.cm.coolwarm)
+       # 繪製測試集的實際樣本點
+       scatter = axes[0].scatter(X_test[:, 0], X_test[:, 1], c=y_test, edgecolor='k', cmap=plt.cm.coolwarm, s=60, label=y_test)
+       axes[0].set_title("隨機森林決策邊界與測試集分布", fontsize=8, pad=15)
+       axes[0].set_xlabel(iris.feature_names[0], fontsize=8)
+       axes[0].set_ylabel(iris.feature_names[1], fontsize=8)
+       # 建立圖例
+       handles, _ = scatter.legend_elements()
+       axes[0].legend(handles, iris.target_names, loc="lower right", title="實際類別")
+       # --- 圖二：預測機率信賴度分布圖 ---
+       # 取得模型對測試集預測各類別的機率
+       y_proba = clf.predict_proba(X_test)
+       # 取得模型最終預測的最大機率值（代表對該預測的信心度）
+       max_proba = np.max(y_proba, axis=1)
+       # 繪製預測信賴度的密度分布 (KDE)
+       sns.histplot(max_proba, kde=True, ax=axes[1], color="skyblue", bins=10, edgecolor="white")
+       axes[1].set_title("模型預測信賴度（最大機率）分布圖", fontsize=8, pad=15)
+       axes[1].set_xlabel("預測機率 (Confidence)", fontsize=8)
+       axes[1].set_ylabel("樣本數量 / 密度", fontsize=8)
+       axes[1].axvline(x=0.5, color='red', linestyle='--', label='隨機猜測門檻 (0.5)')
+       axes[1].legend()
+       CanvasFig.tight_layout()
+       Canvas2.draw()
+
+#########################
+#########################
+#########################
+def MethodGBR(LF_subWIN):
+    pass
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from sklearn.datasets import load_iris
+    #from sklearn.datasets import make_regression
+    from sklearn.model_selection import train_test_split
+    from sklearn.ensemble import GradientBoostingRegressor
+    from sklearn.metrics import mean_squared_error, r2_score
+    
+    ## 1. Generate a synthetic dataset for regression
+    #X, y = make_regression(n_samples=500, n_features=5, noise=0.1, random_state=42)
+    #  
+    ## 2. Split the dataset into training and testing sets (80% train, 20% test)
+    #X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+    # 1. 載入資料（僅取前兩個特徵以利二維視覺化）
+    iris = load_iris()
+    X = iris.data[:, :2]  # 只取 sepal length 和 sepal width
+    y = iris.target
+    
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+    
+    # 3. Initialize the Gradient Boosting Regressor with core hyperparameters
+    gbr = GradientBoostingRegressor(
+        n_estimators=100,      # Number of boosting stages (trees)
+        learning_rate=0.1,     # Shrinkage factor to prevent overfitting
+        max_depth=3,           # Maximum depth of individual regression trees
+        subsample=0.8,         # Fraction of samples for fitting individual trees
+        random_state=42
+    )
+    
+    # 4. Train the model
+    gbr.fit(X_train, y_train)
+    
+    # 5. Make predictions on the test data
+    y_pred = gbr.predict(X_test)
+    
+    # 6. Evaluate model performance
+    mse = mean_squared_error(y_test, y_pred)
+    r2 = r2_score(y_test, y_pred)
+    
+    print(f"Mean Squared Error (MSE): {mse:.4f}")
+    print(f"R-squared (R2) Score:     {r2:.4f}")
+    
+    # 7. Plot Feature Importances
+    feature_importance = gbr.feature_importances_
+    sorted_idx = np.argsort(feature_importance)
+    pos = np.arange(sorted_idx.shape[0]) + 0.5
+    
+    ich=1
+
+    if ich==0:
+       plt.figure(figsize=(10, 5))
+       plt.barh(pos, feature_importance[sorted_idx], align="center", color="skyblue")
+       plt.yticks(pos, [f"Feature {i}" for i in sorted_idx])
+       plt.xlabel("Relative Importance")
+       plt.title("Variable Importance for Gradient Boosting Regressor")
+       plt.show()
+    
+    if ich==1:
+       import numpy as np
+       from io import BytesIO
+       import matplotlib.pyplot as plt
+       from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
+       # 【關鍵】指定 Mac 內建支援中文的字型，避免 Mac 上出現方塊亂碼
+       plt.rcParams['font.sans-serif'] = ['Arial Unicode MS', 'PingFang TC']
+       plt.rcParams['axes.unicode_minus'] = False  # 正確顯示負號
+
+       Canvas=tkinter.Canvas(LF_subWIN)
+       Canvas.place(relx=0.1,rely=0.15,relwidth=0.8,relheight=0.8)
+       CanvasFig=plt.Figure()
+       Canvas2=FigureCanvasTkAgg(CanvasFig,Canvas)
+       Canvas2.get_tk_widget().place(relx=0,rely=0,relwidth=1,relheight=1)
+       CanvasFig.clear()
+
+       axes=[[] for ii in range(1*1)]
+
+       # 3. 開始畫圖
+       axes[0] =CanvasFig.add_subplot(1,1,1)
+       axes[0].barh(pos, feature_importance[sorted_idx], align="center", color="skyblue")
+       axes[0].set_yticks(pos, [f"Feature {i}" for i in sorted_idx])
+       axes[0].set_xlabel("Relative Importance")
+       axes[0].set_title("Variable Importance for Gradient Boosting Regressor")
+       Canvas2.draw()
+
+#########################
+#########################
+#########################
+def MethodDTR(LF_subWIN):
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from sklearn.datasets import load_iris
+    from sklearn.tree import DecisionTreeRegressor
+    
+    # 1. 載入資料
+    iris = load_iris()
+    X = iris.data[:, :2]
+    y = iris.target
+    
+    # 2. 直接訓練模型（我們把參數直接寫在括號內，不用字典）
+    model = DecisionTreeRegressor(max_depth=3, min_samples_split=2, min_samples_leaf=1, random_state=42)
+    model.fit(X, y)
+    
+    # 3. 畫圖驗證
+    x_min, x_max = X[:, 0].min() - 0.5, X[:, 0].max() + 0.5
+    y_min, y_max = X[:, 1].min() - 0.5, X[:, 1].max() + 0.5
+    xx, yy = np.meshgrid(np.arange(x_min, x_max, 0.02), np.arange(y_min, y_max, 0.02))
+    
+    Z = model.predict(np.c_[xx.ravel(), yy.ravel()])
+    Z = Z.reshape(xx.shape)
+    
+    ich=1
+    if ich==0:
+       plt.contourf(xx, yy, Z, cmap='RdYlBu', alpha=0.6)
+       plt.scatter(X[:, 0], X[:, 1], c=y, cmap='RdYlBu', edgecolors='black')
+       plt.title("DTR Test Success")
+       plt.show()
+
+    if ich==1:
+       import numpy as np
+       from io import BytesIO
+       import matplotlib.pyplot as plt
+       from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
+       # 【關鍵】指定 Mac 內建支援中文的字型，避免 Mac 上出現方塊亂碼
+       plt.rcParams['font.sans-serif'] = ['Arial Unicode MS', 'PingFang TC']
+       plt.rcParams['axes.unicode_minus'] = False  # 正確顯示負號
+
+       Canvas=tkinter.Canvas(LF_subWIN)
+       Canvas.place(relx=0.1,rely=0.15,relwidth=0.8,relheight=0.8)
+       CanvasFig=plt.Figure()
+       Canvas2=FigureCanvasTkAgg(CanvasFig,Canvas)
+       Canvas2.get_tk_widget().place(relx=0,rely=0,relwidth=1,relheight=1)
+       CanvasFig.clear()
+
+       axes=[[] for ii in range(1*1)]
+       axes[0] =CanvasFig.add_subplot(1,1,1)
+
+       axes[0].contourf(xx, yy, Z, cmap='RdYlBu', alpha=0.6)
+       axes[0].scatter(X[:, 0], X[:, 1], c=y, cmap='RdYlBu', edgecolors='black')
+       axes[0].set_title("DTR Test Success")
+       Canvas2.draw()
+ 
+######################
+######################
+######################
+def MethodSVR(LF_subWIN):
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from sklearn.datasets import load_iris
+    from sklearn.model_selection import train_test_split
+    from sklearn.preprocessing import StandardScaler
+    from sklearn.svm import SVR
+    from sklearn.metrics import mean_squared_error, r2_score
+    
+    # 1. 載入資料（僅取前兩個特徵以利二維視覺化）
+    iris = load_iris()
+    X = iris.data[:, :2]  # 只取 sepal length 和 sepal width
+    y = iris.target
+    
+    # 2. 切分訓練集與測試集
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+    
+    # 3. SVR 對特徵尺度極度敏感，必須建立標準化器
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(X_train)
+    X_test_scaled = scaler.transform(X_test)
+    
+    # 4. 初始化並訓練 SVR 模型 (使用 RBF Kernel)
+    # 直接將參數寫在括號內，徹底避免字典語法帶來的冒號出錯問題
+    model = SVR(kernel="rbf", C=1.0, gamma="scale")
+    model.fit(X_train_scaled, y_train)
+    
+    # 5. 預測與評估
+    y_pred = model.predict(X_test_scaled)
+    print(f"測試集均方誤差 (MSE): {mean_squared_error(y_test, y_pred):.4f}")
+    print(f"測試集 R2 分數: {r2_score(y_test, y_pred):.4f}")
+    
+    # 6. 建立網格以繪製連續的預測表面
+    x_min, x_max = X_train_scaled[:, 0].min() - 0.5, X_train_scaled[:, 0].max() + 0.5
+    y_min, y_max = X_train_scaled[:, 1].min() - 0.5, X_train_scaled[:, 1].max() + 0.5
+    xx, yy = np.meshgrid(np.arange(x_min, x_max, 0.02),
+                         np.arange(y_min, y_max, 0.02))
+    
+    # 預測網格上每個點的連續數值
+    Z = model.predict(np.c_[xx.ravel(), yy.ravel()])
+    Z = Z.reshape(xx.shape)
+
+    ich=1
+  
+    if ich==0:
+       # 7. 開始繪圖
+       plt.figure(figsize=(10, 7))
+       
+       # 繪製 SVR RBF 獨有的平滑流線型、圓弧狀連續預測表面 (等高線圖)
+       contour = plt.contourf(xx, yy, Z, cmap="RdYlBu", alpha=0.6)
+       plt.colorbar(contour, label="SVR RBF Predicted Value")
+       
+       # 繪製真實資料點（使用標準化後的座標填色）
+       plt.scatter(X_train_scaled[:, 0], X_train_scaled[:, 1], c=y_train, cmap="RdYlBu", 
+                   edgecolors="black", marker="o", s=50, label="Train Data")
+       plt.scatter(X_test_scaled[:, 0], X_test_scaled[:, 1], c=y_test, cmap="RdYlBu", 
+                   edgecolors="white", marker="s", s=70, linewidth=1.5, label="Test Data")
+       
+       # 圖表標題與標籤設定
+       plt.title("SVR (RBF Kernel) 2D Prediction Surface", fontsize=14)
+       plt.xlabel("Sepal Length (Standardized)", fontsize=12)
+       plt.ylabel("Sepal Width (Standardized)", fontsize=12)
+       plt.legend(loc="lower right")
+       plt.grid(True, linestyle="--", alpha=0.3)
+       
+       plt.show()
+
+    if ich==1:
+       # 7. 開始繪圖
+       import numpy as np
+       from io import BytesIO
+       import matplotlib.pyplot as plt
+       from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
+       # 【關鍵】指定 Mac 內建支援中文的字型，避免 Mac 上出現方塊亂碼
+       plt.rcParams['font.sans-serif'] = ['Arial Unicode MS', 'PingFang TC']
+       plt.rcParams['axes.unicode_minus'] = False  # 正確顯示負號
+
+       Canvas=tkinter.Canvas(LF_subWIN)
+       Canvas.place(relx=0.1,rely=0.15,relwidth=0.8,relheight=0.8)
+       CanvasFig=plt.Figure()
+       Canvas2=FigureCanvasTkAgg(CanvasFig,Canvas)
+       Canvas2.get_tk_widget().place(relx=0,rely=0,relwidth=1,relheight=1)
+       CanvasFig.clear()
+
+       axes=[[] for ii in range(1*1)]
+       axes[0] =CanvasFig.add_subplot(1,1,1)
+
+       
+       # 繪製 SVR RBF 獨有的平滑流線型、圓弧狀連續預測表面 (等高線圖)
+       contour = axes[0].contourf(xx, yy, Z, cmap="RdYlBu", alpha=0.6)
+       CanvasFig.colorbar(contour, label="SVR RBF Predicted Value")
+       
+       # 繪製真實資料點（使用標準化後的座標填色）
+       axes[0].scatter(X_train_scaled[:, 0], X_train_scaled[:, 1], c=y_train, cmap="RdYlBu", 
+                   edgecolors="black", marker="o", s=50, label="Train Data")
+       axes[0].scatter(X_test_scaled[:, 0], X_test_scaled[:, 1], c=y_test, cmap="RdYlBu", 
+                   edgecolors="white", marker="s", s=70, linewidth=1.5, label="Test Data")
+       
+       # 圖表標題與標籤設定
+       axes[0].set_title("SVR (RBF Kernel) 2D Prediction Surface", fontsize=8)
+       axes[0].set_xlabel("Sepal Length (Standardized)", fontsize=8)
+       axes[0].set_ylabel("Sepal Width (Standardized)", fontsize=8)
+       axes[0].legend(loc="lower right")
+       axes[0].grid(True, linestyle="--", alpha=0.3)
+       Canvas2.draw()
+       
+
+######################
+######################
+######################
+def MethodBR(LF_subWIN):
+    pass
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from sklearn.datasets import load_iris
+    from sklearn.model_selection import train_test_split
+    from sklearn.linear_model import BayesianRidge
+    from sklearn.metrics import mean_squared_error, r2_score
+    
+    # 1. 載入資料（僅取前兩個特徵以利二維視覺化）
+    iris = load_iris()
+    X = iris.data[:, :2]  # 只取 sepal length 和 sepal width
+    y = iris.target
+    
+    # 2. 切分訓練集與測試集
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+    
+    # 3. 初始化並訓練貝氏脊迴歸模型 (將 n_iter 修正為 max_iter)
+    model = BayesianRidge(max_iter=300, tol=0.001)
+    model.fit(X_train, y_train)
+    
+    # 4. 預測與評估
+    y_pred = model.predict(X_test)
+    print(f"測試集均方誤差 (MSE): {mean_squared_error(y_test, y_pred):.4f}")
+    print(f"測試集 R2 分數: {r2_score(y_test, y_pred):.4f}")
+    
+    # 5. 建立網格以繪製連續的預測表面
+    x_min, x_max = X_train[:, 0].min() - 0.5, X_train[:, 0].max() + 0.5
+    y_min, y_max = X_train[:, 1].min() - 0.5, X_train[:, 1].max() + 0.5
+    xx, yy = np.meshgrid(np.arange(x_min, x_max, 0.02),
+                         np.arange(y_min, y_max, 0.02))
+    
+    # 預測網格上每個點的連續數值
+    Z = model.predict(np.c_[xx.ravel(), yy.ravel()])
+    Z = Z.reshape(xx.shape)
+
+    ich=1
+
+    if ich==0:
+       # 6. 開始繪圖
+       plt.figure(figsize=(10, 7))
+       
+       # 繪製貝氏脊迴歸產生的線性平行漸層預測表面
+       contour = plt.contourf(xx, yy, Z, cmap="RdYlBu", alpha=0.6)
+       plt.colorbar(contour, label="Bayesian Ridge Predicted Value")
+       
+       # 繪製真實資料點
+       scatter_train = plt.scatter(X_train[:, 0], X_train[:, 1], c=y_train, cmap="RdYlBu", 
+                                   edgecolors="black", marker="o", s=50, label="Train Data")
+       scatter_test = plt.scatter(X_test[:, 0], X_test[:, 1], c=y_test, cmap="RdYlBu", 
+                                  edgecolors="white", marker="s", s=70, linewidth=1.5, label="Test Data")
+       
+       # 圖表設定
+       plt.title("Bayesian Ridge Regression 2D Prediction Surface", fontsize=14)
+       plt.xlabel(iris.feature_names[0], fontsize=12)
+       plt.ylabel(iris.feature_names[1], fontsize=12)
+       plt.legend(loc="lower right")
+       plt.grid(True, linestyle="--", alpha=0.3)
+       
+       plt.show()
+       
+    if ich==1:
+       # 7. 開始繪圖
+       import numpy as np
+       from io import BytesIO
+       import matplotlib.pyplot as plt
+       from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
+       # 【關鍵】指定 Mac 內建支援中文的字型，避免 Mac 上出現方塊亂碼
+       plt.rcParams['font.sans-serif'] = ['Arial Unicode MS', 'PingFang TC']
+       plt.rcParams['axes.unicode_minus'] = False  # 正確顯示負號
+
+       Canvas=tkinter.Canvas(LF_subWIN)
+       Canvas.place(relx=0.1,rely=0.15,relwidth=0.8,relheight=0.8)
+       CanvasFig=plt.Figure()
+       Canvas2=FigureCanvasTkAgg(CanvasFig,Canvas)
+       Canvas2.get_tk_widget().place(relx=0,rely=0,relwidth=1,relheight=1)
+       CanvasFig.clear()
+
+       axes=[[] for ii in range(1*1)]
+       axes[0] =CanvasFig.add_subplot(1,1,1)
+       
+       # 繪製貝氏脊迴歸產生的線性平行漸層預測表面
+       contour = axes[0].contourf(xx, yy, Z, cmap="RdYlBu", alpha=0.6)
+       CanvasFig.colorbar(contour, label="Bayesian Ridge Predicted Value")
+       
+       # 繪製真實資料點
+       scatter_train = axes[0].scatter(X_train[:, 0], X_train[:, 1], c=y_train, cmap="RdYlBu", 
+                                   edgecolors="black", marker="o", s=50, label="Train Data")
+       scatter_test = axes[0].scatter(X_test[:, 0], X_test[:, 1], c=y_test, cmap="RdYlBu", 
+                                  edgecolors="white", marker="s", s=70, linewidth=1.5, label="Test Data")
+       
+       # 圖表設定
+       axes[0].set_title("Bayesian Ridge Regression 2D Prediction Surface", fontsize=8)
+       axes[0].set_xlabel(iris.feature_names[0], fontsize=8)
+       axes[0].set_ylabel(iris.feature_names[1], fontsize=8)
+       axes[0].legend(loc="lower right")
+       axes[0].grid(True, linestyle="--", alpha=0.3)
+       Canvas2.draw() 
+
+######################
+######################
+######################
+def cmdRUN(LF_subWIN):
+    global optionValue
+    for w in LF_subWIN.winfo_children():
+        if isinstance(w,tkinter.Button) or isinstance(w,tkinter.OptionMenu):
+           pass
+        else:
+           print(w)
+           w.destroy()
+    pass
+    if optionValue.get()=='RF':
+       pass     
+       MethodRF(LF_subWIN)
+    if optionValue.get()=='GBR':
+       pass     
+       MethodGBR(LF_subWIN)
+    if optionValue.get()=='DTR':
+       pass    
+       MethodDTR(LF_subWIN)
+    if optionValue.get()=='SVR':
+       pass    
+       MethodSVR(LF_subWIN)
+    if optionValue.get()=='BR':
+       pass    
+       MethodBR(LF_subWIN)
+    
+######################
+######################
+######################
+
+def cmdEditPH1():
+    pass
+    import os
+    dirname=os.path.join(physicsHOMEDIR,'physicsSpace')
+    filePH1TXT=os.path.join(dirname,'PH1.txt')
+    fileEditTXT=os.path.join(dirname,'physicsEdit.txt')
+    a=filePH1TXT
+    if os.path.exists(fileEditTXT):
+       exec(open(fileEditTXT,'r',encoding='utf-8').read(),globals())
+       cmds='physicsEdit("LCMDs+dir='+os.path.dirname(a)+'+file='+os.path.basename(a)+'+physicsEdit")'
+       cmds=cmds.replace('\\','\\\\')
+       exec(cmds)
+
+def cmdPH1_NOTE(LF_subWIN):
+    global PH1LB02
+    for w in LF_subWIN.winfo_children():
+        if isinstance(w,tkinter.Button) or isinstance(w,tkinter.OptionMenu):
+           pass
+        else:
+           w.destroy()
+    pass
+    ypos=0
+    DY=0.2
+    xpos=0.05;ypos=ypos+DY;DX=1-0.1;DY=0.7
+    PH1LB02=tkinter.Text(LF_subWIN)
+    PH1LB02.configure(relief="solid")
+    PH1LB02.configure(borderwidth=1)    
+    
+    
+    
+    ###CONTBEGIN
+
+    ss="""<title>
+Physics: Three-body Problem
+</title>
+
+<content>
+dataset and codes
+https://codeocean.com/capsule/4347581/tree/v2
+
+</content>
+
+<homework>
+1. 30% GUI imporovement
+2. 30% 2-body simulation
+3. 40% gained knowledge
+</homework>
+
+<hello>
+test
+</ehello>
+
+"""
+    ###CONTEND
+
+
+
+    PH1LB02.insert(0.0,ss)
+    PH1LB02.place(relx=xpos,rely=ypos,relwidth=DX,relheight=DY)
+    xpos=1-0.05;ypos=ypos+DY;DX=0.05;DY=0.7
+    PH1LB02_Scrollbar=tkinter.Scrollbar(LF_subWIN)
+    PH1LB02_Scrollbar.place(relx=xpos,rely=ypos,relwidth=DX,relheight=DY)
+
+def PH1():
+    import tkinter
+    import os
+    global LF_subWIN
+    global optionValue
+    global PH1_NoteB
+    pass
+    print('homework1')
+    LF_subWIN.configure(text='Homework1')
+    for w in LF_subWIN.winfo_children():
+        w.destroy()
+    NNN=9
+    iii=-1
+    iii=iii+1 
+    DXDX=1.0/NNN
+    DocB01=tkinter.Button(LF_subWIN)
+    DocB01.configure(text='Doc1')
+    import platform
+    filePDF=os.path.join(os.path.join(os.path.join(physicsHOMEDIR,'physicsSpace'),'PH1Space'),'Machine_learning_assisted_composition_design_of_hi.pdf')
+    if platform.system() in ['Darwin','Linux']:
+       DocB01.configure(command=lambda a=filePDF:os.system('open "'+a+'"'))
+    else:
+       DocB01.configure(command=lambda a=filePDF:os.system('"'+a+'"'))
+    DocB01.place(relx=(iii%NNN)*DXDX,rely=0,relwidth=DXDX,relheight=0.05)
+    ###
+    iii=iii+1 
+    DocB02=tkinter.Button(LF_subWIN)
+    DocB02.configure(text='Doc2')
+
+    if platform.system() in ['Darwin','Linux']:
+       DocB02.configure(command=lambda a='https://towardsdatascience.com/use-python-to-create-three-body-orbits-329ffb5b2627/':os.system('open -a "Google Chrome" "'+a+'"'))
+    else:
+       DocB02.configure(command=lambda a='https://towardsdatascience.com/use-python-to-create-three-body-orbits-329ffb5b2627/':os.system('start '+a))        
+    DocB02.place(relx=(iii%NNN)*DXDX,rely=0,relwidth=DXDX,relheight=0.05)
+    ###
+    iii=iii+1 
+    DocB03=tkinter.Button(LF_subWIN)
+    DocB03.configure(text='Doc3')
+    if platform.system() in ['Darwin','Linux']:
+       DocB03.configure(command=lambda a='https://www.youtube.com/watch?v=K6VesuCW-nM':os.system('open -a "Google Chrome" "'+a+'"'))
+    else:
+       DocB03.configure(command=lambda a='https://www.youtube.com/watch?v=K6VesuCW-nM':os.system('start '+a))        
+    DocB03.place(relx=(iii%NNN)*DXDX,rely=0,relwidth=DXDX,relheight=0.05)
+    ###
+    iii=iii+1 
+    RUNB03=tkinter.Button(LF_subWIN)
+    RUNB03.configure(text='RUN')
+    RUNB03.configure(command=lambda a=LF_subWIN:cmdRUN(a))
+    RUNB03.place(relx=(iii%NNN)*DXDX,rely=0,relwidth=DXDX,relheight=0.05)
+    ###
+    iii=iii+1 
+    optionList=['RF','GBR','DTR','SVR','BR']
+    optionValue=tkinter.StringVar()
+    CHKOM04=tkinter.OptionMenu(LF_subWIN,optionValue,*optionList)
+    optionValue.set(optionList[0])
+    CHKOM04.place(relx=(iii%NNN)*DXDX,rely=0,relwidth=DXDX,relheight=0.05)
+    ###
+    iii=iii+1 
+    PH1_EditB=tkinter.Button(LF_subWIN)
+    PH1_EditB.configure(text='Edit-PH1')
+    PH1_EditB.configure(command=cmdEditPH1)
+    PH1_EditB.place(relx=(iii%NNN)*DXDX,rely=0,relwidth=DXDX,relheight=0.05)
+    ###
+    iii=iii+1 
+    PH1_NoteB=tkinter.Button(LF_subWIN)
+    PH1_NoteB.configure(text='mkNOTE')
+    PH1_NoteB.configure(command=lambda a=LF_subWIN:cmdPH1_NOTE(a))
+    PH1_NoteB.place(relx=(iii%NNN)*DXDX,rely=0,relwidth=DXDX,relheight=0.05)
+    ###
+    iii=iii+1 
+    PH1_SAVEB=tkinter.Button(LF_subWIN)
+    PH1_SAVEB.configure(text='SAVE')
+    PH1_SAVEB.configure(command=cmdPH1_SAVEB)
+    PH1_SAVEB.place(relx=(iii%NNN)*DXDX,rely=0,relwidth=DXDX,relheight=0.05)
+    iii=iii+1 
+    PH1_SpaceB=tkinter.Button(LF_subWIN)
+    PH1_SpaceB.configure(text='Space')
+    PH1_SpaceB.configure(command=cmdPH1_SpaceB)
+    PH1_SpaceB.place(relx=(iii%NNN)*DXDX,rely=0,relwidth=DXDX,relheight=0.05)
